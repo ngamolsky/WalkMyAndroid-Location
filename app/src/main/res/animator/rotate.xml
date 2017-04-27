@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <!--
   Copyright 2017 Google Inc.
 
@@ -13,10 +14,19 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<resources>
-    <string name="app_name">Walk My Android</string>
-    <string name="get_location">Get Location</string>
-    <string name="textview_hint">Press the button to get the last known
-        location
-    </string>
-</resources>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:ordering="sequentially">
+    <objectAnimator
+        android:propertyName="rotation"
+        android:duration="500"
+        android:valueFrom="-10"
+        android:valueTo="10"
+        android:repeatCount="infinite"
+        android:repeatMode= "reverse"/>
+    <objectAnimator
+        android:propertyName="rotation"
+        android:duration="100"
+        android:valueFrom="10"
+        android:valueTo="0"
+        android:repeatCount="1"/>
+</set>
