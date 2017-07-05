@@ -16,6 +16,8 @@
 package com.example.android.walkmyandroid;
 
 import android.Manifest;
+import android.animation.AnimatorInflater;
+import android.animation.AnimatorSet;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -29,12 +31,15 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnSuccessListener;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,10 +48,22 @@ import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
+    // Constants
     private static final int REQUEST_LOCATION_PERMISSION = 1;
+    private static final String TRACKING_LOCATION_KEY = "tracking_location";
+
+    // Views
     private Button mLocationButton;
     private TextView mLocationTextView;
+    private ImageView mAndroidImageView;
+
+    // Location classes
+    private boolean mTrackingLocation;
     private FusedLocationProviderClient mFusedLocationClient;
+    private LocationCallback mLocationCallback;
+
+    // Animation
+    private AnimatorSet mRotateAnim;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,25 +72,67 @@ public class MainActivity extends AppCompatActivity {
 
         mLocationButton = (Button) findViewById(R.id.button_location);
         mLocationTextView = (TextView) findViewById(R.id.textview_location);
+        mAndroidImageView = (ImageView) findViewById(R.id.imageview_android);
 
-        // Initialize the FusedLocationClient
+
+        // Initialize the FusedLocationClient.
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(
                 this);
 
+        // Set up the animation.
+        mRotateAnim = (AnimatorSet) AnimatorInflater.loadAnimator
+                (this, R.animator.rotate);
+        mRotateAnim.setTarget(mAndroidImageView);
+
+        // Restore the state if the activity is recreated.
+        if (savedInstanceState != null) {
+            mTrackingLocation = savedInstanceState.getBoolean(
+                    TRACKING_LOCATION_KEY);
+        }
+
+        // Set the listener for the location button.
         mLocationButton.setOnClickListener(new View.OnClickListener() {
+            /**
+             * Toggle the tracking state.
+             * @param v The track location button.
+             */
             @Override
             public void onClick(View v) {
-                getLocation();
+                if (!mTrackingLocation) {
+                    startTrackingLocation();
+                    mTrackingLocation = true;
+                } else {
+                    stopTrackingLocation();
+                    mTrackingLocation = false;
+                }
             }
         });
+
+        // Initialize the location callbacks.
+        mLocationCallback = new LocationCallback() {
+            /**
+             * This is the callback that is triggered when the
+             * FusedLocationClient updates your location.
+             * @param locationResult The result containing the device location.
+             */
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                // If tracking is turned on, reverse geocode into an address
+                if (mTrackingLocation) {
+                    new FetchAddressTask().execute(locationResult
+                            .getLastLocation());
+                }
+            }
+        };
     }
 
-
     /**
-     * Requests location permissions and gets the location using the
-     * FusedLocationClient if the permission is granted.
+     * Starts tracking the device. Checks for
+     * permissions, and requests them if they aren't present. If they are,
+     * requests periodic location updates, sets a loading text and starts the
+     * animation.
      */
-    private void getLocation() {
+    private void startTrackingLocation() {
         if (ActivityCompat.checkSelfPermission(this,
                 Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -81,28 +140,58 @@ public class MainActivity extends AppCompatActivity {
                             {Manifest.permission.ACCESS_FINE_LOCATION},
                     REQUEST_LOCATION_PERMISSION);
         } else {
-
-            mFusedLocationClient.getLastLocation().addOnSuccessListener(
-                    new OnSuccessListener<Location>() {
-                        @Override
-                        public void onSuccess(Location location) {
-                            if (location != null) {
-                                // Start the reverse geocode AsyncTask
-                                new FetchAddressTask().execute(location);
-                            } else {
-                                mLocationTextView.setText(R.string.no_location);
-                            }
-                        }
-                    });
+            mFusedLocationClient.requestLocationUpdates
+                    (getLocationRequest(),
+                            mLocationCallback,
+                            null /* Looper */);
 
             // Set a loading text while you wait for the address to be
             // returned
             mLocationTextView.setText(getString(R.string.address_text,
                     getString(R.string.loading),
                     System.currentTimeMillis()));
+            mLocationButton.setText(R.string.stop_tracking_location);
+            mRotateAnim.start();
         }
     }
 
+
+    /**
+     * Stops tracking the device. Removes the location
+     * updates, stops the animation, and resets the UI.
+     */
+    private void stopTrackingLocation() {
+        if (mTrackingLocation) {
+            mFusedLocationClient.removeLocationUpdates(mLocationCallback);
+            mLocationButton.setText(R.string.start_tracking_location);
+            mLocationTextView.setText(R.string.textview_hint);
+            mRotateAnim.end();
+        }
+    }
+
+
+    /**
+     * Sets up the location request.
+     *
+     * @return The LocationRequest object containing the desired parameters.
+     */
+    private LocationRequest getLocationRequest() {
+        LocationRequest locationRequest = new LocationRequest();
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(5000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        return locationRequest;
+    }
+
+
+    /**
+     * Saves the last location on configuration change
+     */
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        outState.putBoolean(TRACKING_LOCATION_KEY, mTrackingLocation);
+        super.onSaveInstanceState(outState);
+    }
 
     /**
      * Callback that is invoked when the user responds to the permissions
@@ -127,7 +216,7 @@ public class MainActivity extends AppCompatActivity {
                 if (grantResults.length > 0
                         && grantResults[0]
                         == PackageManager.PERMISSION_GRANTED) {
-                    getLocation();
+                    startTrackingLocation();
                 } else {
                     Toast.makeText(this,
                             R.string.location_permission_denied,
@@ -135,6 +224,23 @@ public class MainActivity extends AppCompatActivity {
                 }
                 break;
         }
+    }
+
+
+    @Override
+    protected void onPause() {
+        if (mTrackingLocation) {
+            stopTrackingLocation();
+        }
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        if (mTrackingLocation) {
+            startTrackingLocation();
+        }
+        super.onResume();
     }
 
     /**
@@ -152,7 +258,6 @@ public class MainActivity extends AppCompatActivity {
 
             // Get the passed in location
             Location location = params[0];
-
             List<Address> addresses = null;
             String resultMessage = "";
 
@@ -177,6 +282,7 @@ public class MainActivity extends AppCompatActivity {
                         location.getLongitude(), illegalArgumentException);
             }
 
+            // If no addresses found, print an error message.
             if (addresses == null || addresses.size() == 0) {
                 if (resultMessage.isEmpty()) {
                     resultMessage = MainActivity.this
@@ -203,13 +309,20 @@ public class MainActivity extends AppCompatActivity {
             return resultMessage;
         }
 
-
+        /**
+         * Called once the background thread is finished and updates the
+         * UI with the result.
+         * @param address The resulting reverse geocoded address, or error
+         *                message if the task failed.
+         */
         @Override
         protected void onPostExecute(String address) {
-            // Update the UI
-            mLocationTextView.setText(
-                    MainActivity.this.getString(R.string.address_text,
-                            address, System.currentTimeMillis()));
+            if (mTrackingLocation) {
+                // Update the UI
+                mLocationTextView.setText(
+                        MainActivity.this.getString(R.string.address_text,
+                                address, System.currentTimeMillis()));
+            }
             super.onPostExecute(address);
         }
     }

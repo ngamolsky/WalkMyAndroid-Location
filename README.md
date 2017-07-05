@@ -1,15 +1,15 @@
-WalkMyAndroid - Starter Code
-============
+WalkMyAndroid - Solution Code
+=============================
 
-Starter code for the Walk My Android app which tracks location using the
+Solution code for the WalkMyAndroid app, which tracks location using the
 Location API.
 
 Introduction
 ------------
-The starter code includes two layout files, one for landscape and one for
-portrait mode, some images, and a predefined animation that will be used to
-build up the final version.
-
+The final version of this app has a button that starts tracking the device
+location. It updates the location every ten seconds, reverse geocodes the
+location coordinates into a physical address, and starts an animation to provide
+the user with visual feedback that tracking is on.
 
 Pre-requisites
 --------------
@@ -18,7 +18,7 @@ You should be familiar with:
 - Creating, building, and running apps in Android Studio.
 - The Activity lifecycle.
 - Persisting data across configuration changes.
-- How to use an AsyncTask to do background work.
+- Using an AsyncTask to do background work.
 - Requesting permissions at runtime.
 
 
